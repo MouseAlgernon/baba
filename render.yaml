@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: babylon-library
+    runtime: go
+    buildCommand: go build -o babylon .
+    startCommand: ./babylon
+    envVars:
+      - key: PORT
+        value: 10000

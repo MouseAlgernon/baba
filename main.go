@@ -67,6 +67,19 @@ func makeRuneIndex(alphabet []rune) map[rune]int {
 // Биективная арифметика — сид в base-1114112 (Unicode)
 // ============================================================
 
+// stretchSeed растягивает сид до MAX_SEED_LEN повторением самого себя.
+func stretchSeed(seed string) string {
+	runes := []rune(seed)
+	if len(runes) == 0 || len(runes) >= MAX_SEED_LEN {
+		return seed
+	}
+	out := make([]rune, MAX_SEED_LEN)
+	for i := range out {
+		out[i] = runes[i%len(runes)]
+	}
+	return string(out)
+}
+
 func seedToNumber(seed string) (*big.Int, error) {
 	runes := []rune(seed)
 	if len(runes) == 0 {
@@ -170,6 +183,7 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	if runes := []rune(seed); len(runes) > MAX_SEED_LEN {
 		seed = string(runes[:MAX_SEED_LEN])
 	}
+	seed = stretchSeed(seed)
 	seed = strings.TrimSpace(seed)
 	if seed == "" { writeJSON(w, 400, Response{Error: "сид не может быть пустым"}); return }
 
@@ -310,7 +324,7 @@ const indexHTML = `<!DOCTYPE html>
       placeholder="Любой текст: русский, English, 中文, эмодзи 🌍, символы !@#$..."
       oninput="updateSeedCount()" onkeydown="if(event.key==='Enter')doGenerate()">
     <div class="char-count" id="seed-count">0 / 159</div>
-    <div class="hint">Принимается любой текст на любом языке, до <strong id="max-len-hint">159</strong> символов. Более длинный сид обрезается автоматически.</div>
+    <div class="hint">Любой язык, эмодзи, символы. До <strong id="max-len-hint">159</strong> символов. Короткий сид автоматически повторяется до максимума — разные слова дают разные страницы.</div>
     <div class="btn-row">
       <button class="btn" onclick="doGenerate()" id="btn-gen">Открыть страницу</button>
     </div>
@@ -411,8 +425,17 @@ function updateSeedCount() {
   const el = document.getElementById('seed-input');
   const n = [...el.value].length;
   const cnt = document.getElementById('seed-count');
-  cnt.textContent = n + ' / ' + MAX_SEED;
-  cnt.classList.toggle('over', n > MAX_SEED);
+  if (n === 0) {
+    cnt.textContent = '0 / ' + MAX_SEED;
+    cnt.classList.remove('over');
+  } else if (n > MAX_SEED) {
+    cnt.textContent = n + ' / ' + MAX_SEED + ' (обрезается до ' + MAX_SEED + ')';
+    cnt.classList.add('over');
+  } else {
+    const stretched = n < MAX_SEED ? ' → растянется до ' + MAX_SEED : '';
+    cnt.textContent = n + ' / ' + MAX_SEED + stretched;
+    cnt.classList.remove('over');
+  }
 }
 function updatePageCount() {
   const el = document.getElementById('page-input');
